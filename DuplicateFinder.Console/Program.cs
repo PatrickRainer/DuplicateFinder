@@ -1,24 +1,30 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
-public class Program
+namespace DuplicateFinder.Console;
+
+public abstract class Program
 {
     public static async Task Main(string[] args)
     {
-        Console.WriteLine("Find and delete duplicate files");
-        Console.WriteLine("====================================");
-        Console.WriteLine("Please enter the path to the folder you want to analyze:");
-        var path = Console.ReadLine();
-        Console.WriteLine("====================================");
-        Console.WriteLine(
+        System.Console.WriteLine("Find and delete duplicate files");
+        System.Console.WriteLine("====================================");
+        System.Console.WriteLine("Please enter the path to the folder you want to analyze:");
+        
+        var duplicateSearchFilePath = System.Console.ReadLine();
+        
+        System.Console.WriteLine("====================================");
+        System.Console.WriteLine(
             "Start finding Duplicates ..., please Wait it can take a long time depending on the number of files");
 
-        var result = (await SearchFilesWithSameNameAndSize(path)).ToList();
+        var result = (await SearchFilesWithSameNameAndSize(duplicateSearchFilePath ?? throw new InvalidOperationException("Path cannot be null"))).ToList();
 
+        if (Directory.Exists(duplicateSearchFilePath)==false) throw new InvalidOperationException("Path does not exist");
+        
         // Write Result to a text file
-        var logFilePath = Path.Combine(path, "Dupletten.txt");
+        var logFilePath = Path.Combine(duplicateSearchFilePath, "Dupletten.txt");
         await using (var sw = new StreamWriter(logFilePath))
         {
-            await sw.WriteLineAsync("Find Duplicates in Folder: " + path + " at " + DateTime.Now);
+            await sw.WriteLineAsync("Find Duplicates in Folder: " + duplicateSearchFilePath + " at " + DateTime.Now);
             await sw.WriteLineAsync("====================================");
             foreach (var item in result)
             {
@@ -32,15 +38,15 @@ public class Program
             await sw.WriteLineAsync("End of List at " + DateTime.Now);
         }
         
-        Console.WriteLine();
-        Console.WriteLine("====================================");
-        Console.WriteLine("Found " + result.Count + " duplicates");
-        Console.WriteLine("You can investigate the result in the file: " + logFilePath);
+        System.Console.WriteLine();
+        System.Console.WriteLine("====================================");
+        System.Console.WriteLine("Found " + result.Count + " duplicates");
+        System.Console.WriteLine("You can investigate the result in the file: " + logFilePath);
         
         // Ask the user if he wants to delete the duplicates or move them to a specific folder
-        Console.WriteLine("====================================");
-        Console.WriteLine("Do you want to delete the duplicates or move them to a specific folder? (delete/move/abort)");
-        var answer = Console.ReadLine();
+        System.Console.WriteLine("====================================");
+        System.Console.WriteLine("Do you want to delete the duplicates or move them to a specific folder? (delete/move/abort)");
+        var answer = System.Console.ReadLine();
         
         if(answer==null) return;
         
@@ -50,54 +56,54 @@ public class Program
             var deleteResults = DeleteDuplicates(result);
 
             // Write Result to a text file
-            logFilePath = Path.Combine(path, "Dupletten geloescht.txt");
-            using (var sw =
-                   new StreamWriter(logFilePath))
+            logFilePath = Path.Combine(duplicateSearchFilePath, "Duplicates deleted.txt");
+            await using (var sw =
+                         new StreamWriter(logFilePath))
             {
                 foreach (var fileName in deleteResults)
                 {
-                    sw.WriteLine(fileName);
+                    await sw.WriteLineAsync(fileName);
                 }
             }
             
-            Console.WriteLine("====================================");
-            Console.WriteLine("Deleted " + deleteResults.Count + " duplicates");
-            Console.WriteLine("You can investigate the result in the file: " + logFilePath);
+            System.Console.WriteLine("====================================");
+            System.Console.WriteLine("Deleted " + deleteResults.Count + " duplicates");
+            System.Console.WriteLine("You can investigate the result in the file: " + logFilePath);
         }
 
         if (answer.ToLower() == "move")
         {
-            Console.WriteLine("Enter the folder where you want to move the duplicates:");
-            var newFolder = Console.ReadLine();
+            System.Console.WriteLine("Enter the folder where you want to move the duplicates:");
+            var newFolder = System.Console.ReadLine();
             if(Directory.Exists(newFolder) == false)
             {
-                Console.WriteLine("====================================");
-                Console.WriteLine("The folder " + newFolder + " does not exist");
+                System.Console.WriteLine("====================================");
+                System.Console.WriteLine("The folder " + newFolder + " does not exist");
                 return;
             }
 
             void ProgressCallback(int current, int total)
             {
                 ClearCurrentConsoleLine();
-                Console.Write("Moved " + current + " of " + total + " duplicates");
+                System.Console.Write("Moved " + current + " of " + total + " duplicates");
             }
 
             var moveResult = MoveDuplicates(result, newFolder, ProgressCallback);
             
             // Write Result to a text file
-            logFilePath = Path.Combine(path, "Dupletten verschoben.txt");
-            using (var sw =
-                new StreamWriter(logFilePath))
+            logFilePath = Path.Combine(duplicateSearchFilePath, "Duplicates moved.txt");
+            await using (var sw =
+                         new StreamWriter(logFilePath))
             {
                 foreach (var tuple in moveResult)
                 {
-                    sw.WriteLine(tuple.Item1 + " -> " + tuple.Item2);
+                    await sw.WriteLineAsync(tuple.Item1 + " -> " + tuple.Item2);
                 }
             }
             
-            Console.WriteLine("====================================");
-            Console.WriteLine("Moved " + moveResult.Count + " duplicates");
-            Console.WriteLine("You can investigate the result in the file: " + logFilePath);
+            System.Console.WriteLine("====================================");
+            System.Console.WriteLine("Moved " + moveResult.Count + " duplicates");
+            System.Console.WriteLine("You can investigate the result in the file: " + logFilePath);
         }
     }
 
@@ -130,9 +136,9 @@ public class Program
             }
 
             // Show progress in Console
-            if (Console.CursorLeft < 5)
+            if (System.Console.CursorLeft < 5)
             {
-                Console.Write(".");
+                System.Console.Write(".");
             }
             else
             {
@@ -149,10 +155,10 @@ public class Program
 
     static void ClearCurrentConsoleLine()
     {
-        int currentLineCursor = Console.CursorTop;
-        Console.SetCursorPosition(0, Console.CursorTop);
-        Console.Write(new string(' ', Console.WindowWidth)); 
-        Console.SetCursorPosition(0, currentLineCursor);
+        int currentLineCursor = System.Console.CursorTop;
+        System.Console.SetCursorPosition(0, System.Console.CursorTop);
+        System.Console.Write(new string(' ', System.Console.WindowWidth)); 
+        System.Console.SetCursorPosition(0, currentLineCursor);
     }
 
     static List<Tuple<string, string>> MoveDuplicates(List<List<string>> duplicateFiles, string newFolder, Action<int, int> progressCallback)
