@@ -11,12 +11,20 @@ public abstract class Program
         System.Console.WriteLine("Please enter the path to the folder you want to analyze:");
         
         var duplicateSearchFilePath = System.Console.ReadLine();
+        if (duplicateSearchFilePath == null) throw new InvalidOperationException("Path cannot be null");
         
         System.Console.WriteLine("====================================");
         System.Console.WriteLine(
             "Start finding Duplicates ..., please Wait it can take a long time depending on the number of files");
 
-        var result = (await SearchFilesWithSameNameAndSize(duplicateSearchFilePath ?? throw new InvalidOperationException("Path cannot be null"))).ToList();
+        
+        void SearchProgress(string current, string total)
+        {
+            ClearCurrentConsoleLine();
+            System.Console.Write("Searched " + current + " of " + total + " files");
+        }
+        
+        var result = (await SearchFilesWithSameNameAndSize(duplicateSearchFilePath, SearchProgress)).ToList();
 
         if (Directory.Exists(duplicateSearchFilePath)==false) throw new InvalidOperationException("Path does not exist");
         
@@ -108,14 +116,44 @@ public abstract class Program
     }
 
 
-    static Task<IEnumerable<List<string>>> SearchFilesWithSameNameAndSize(string rootFolderPath)
+    static Task<IEnumerable<List<string>>> SearchFilesWithSameNameAndSize(string rootFolderPath, Action<string, string> progressCallback)
     {
         var filesByNameAndSize = new Dictionary<string, List<string>>();
 
         // Get all files in the root folder and its subfolders
-        var allFiles = Directory.GetFiles(rootFolderPath, "*", SearchOption.AllDirectories).ToList();
+        var allFiles = new List<string>();
+        var getFilesThread = new Thread(() =>
+        {
+            allFiles.AddRange(Directory.GetFiles(rootFolderPath, "*", SearchOption.AllDirectories));
+        });
 
         // Show progress in Console
+        // Run the progress update on a separate thread
+        var progressUpdateThread = new Thread(() =>
+        {
+            while (getFilesThread.IsAlive)
+            {
+                // Calculate the progress percentage
+                int progressPercentage = allFiles.Count;
+
+                progressCallback.Invoke("Wait", "...");
+
+                // Add a little delay to avoid high CPU usage
+                Thread.Sleep(1000);
+            }
+        });
+        
+        // Start both threads
+        getFilesThread.Start();
+        progressUpdateThread.Start();
+
+        // Wait for the GetFiles thread to complete
+        getFilesThread.Join();
+
+        // Ensure the progress update thread also stops
+        progressUpdateThread.Join();
+        
+        
 
         foreach (var filePath in allFiles)
         {
@@ -136,14 +174,7 @@ public abstract class Program
             }
 
             // Show progress in Console
-            if (System.Console.CursorLeft < 5)
-            {
-                System.Console.Write(".");
-            }
-            else
-            {
-                ClearCurrentConsoleLine();
-            }
+            progressCallback.Invoke(filesByNameAndSize.Count.ToString(), allFiles.Count.ToString());
             
         }
 
