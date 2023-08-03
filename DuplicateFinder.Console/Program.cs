@@ -1,11 +1,7 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
-using System.Data.SqlTypes;
-
 public class Program
 {
-    static string FolderToAnalyze { get; set; } = @"\\SynologyNas002\homes\veronika.rainer\Photos";
-
     public static async Task Main(string[] args)
     {
         Console.WriteLine("Find and delete duplicate files");
@@ -41,20 +37,20 @@ public class Program
         Console.WriteLine("Found " + result.Count + " duplicates");
         Console.WriteLine("You can investigate the result in the file: " + logFilePath);
         
-        // Ask the user if he wants to delete the duplicates
-        Console.WriteLine("Do you want to delete the duplicates? (y/n)");
+        // Ask the user if he wants to delete the duplicates or move them to a specific folder
+        Console.WriteLine("====================================");
+        Console.WriteLine("Do you want to delete the duplicates or move them to a specific folder? (delete/move/abort)");
         var answer = Console.ReadLine();
-        if (answer == null || answer.ToLower() != "y")
-        {
-            Console.WriteLine("Duplicates not deleted");
-        }
-        else
+        
+        if(answer==null) return;
+        
+        if (answer.ToLower() == "delete")
         {
             // Delete one of the duplicate files
             var deleteResults = DeleteDuplicates(result);
 
             // Write Result to a text file
-            logFilePath = Path.Combine(FolderToAnalyze, "Dupletten geloescht.txt");
+            logFilePath = Path.Combine(path, "Dupletten geloescht.txt");
             using (var sw =
                    new StreamWriter(logFilePath))
             {
@@ -66,6 +62,41 @@ public class Program
             
             Console.WriteLine("====================================");
             Console.WriteLine("Deleted " + deleteResults.Count + " duplicates");
+            Console.WriteLine("You can investigate the result in the file: " + logFilePath);
+        }
+
+        if (answer.ToLower() == "move")
+        {
+            Console.WriteLine("Enter the folder where you want to move the duplicates:");
+            var newFolder = Console.ReadLine();
+            if(Directory.Exists(newFolder) == false)
+            {
+                Console.WriteLine("====================================");
+                Console.WriteLine("The folder " + newFolder + " does not exist");
+                return;
+            }
+
+            void ProgressCallback(int current, int total)
+            {
+                ClearCurrentConsoleLine();
+                Console.Write("Moved " + current + " of " + total + " duplicates");
+            }
+
+            var moveResult = MoveDuplicates(result, newFolder, ProgressCallback);
+            
+            // Write Result to a text file
+            logFilePath = Path.Combine(path, "Dupletten verschoben.txt");
+            using (var sw =
+                new StreamWriter(logFilePath))
+            {
+                foreach (var tuple in moveResult)
+                {
+                    sw.WriteLine(tuple.Item1 + " -> " + tuple.Item2);
+                }
+            }
+            
+            Console.WriteLine("====================================");
+            Console.WriteLine("Moved " + moveResult.Count + " duplicates");
             Console.WriteLine("You can investigate the result in the file: " + logFilePath);
         }
     }
@@ -115,8 +146,8 @@ public class Program
         
         return Task.FromResult(duplicateFiles);
     }
-    
-    public static void ClearCurrentConsoleLine()
+
+    static void ClearCurrentConsoleLine()
     {
         int currentLineCursor = Console.CursorTop;
         Console.SetCursorPosition(0, Console.CursorTop);
@@ -124,11 +155,40 @@ public class Program
         Console.SetCursorPosition(0, currentLineCursor);
     }
 
+    static List<Tuple<string, string>> MoveDuplicates(List<List<string>> duplicateFiles, string newFolder, Action<int, int> progressCallback)
+    {
+        var filesMoved = new List<Tuple<string, string>>();
+
+        // Delete all duplicates except one
+        foreach (var fileList in duplicateFiles)
+        {
+            // Keep the first file and delete the rest
+            for (var i = 1; i < fileList.Count; i++)
+            {
+                var sourceFileName = fileList[i];
+                var destFileName = Path.Combine(newFolder, Path.GetFileName(sourceFileName));
+
+                try
+                {
+                    File.Move(sourceFileName, destFileName);
+                    filesMoved.Add(new Tuple<string, string>(sourceFileName, destFileName));
+
+                    // Callback
+                    progressCallback?.Invoke(filesMoved.Count, duplicateFiles.Count);
+                }
+                catch (Exception e)
+                {
+                    filesMoved.Add(new Tuple<string, string>(sourceFileName,e.Message));
+                }
+            }
+        }
+
+        return filesMoved;
+    }
+
     static List<string> DeleteDuplicates(ICollection<List<string>> duplicateFiles)
     {
         var filesDeleted = new List<string>();
-
-        // Show progress in console
 
         // Delete all duplicates except one
         foreach (var fileList in duplicateFiles)
